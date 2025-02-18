@@ -16,71 +16,103 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
                        subject='',
                        topics=None):  
     '''
-    Display interactive flash cards with both "next" and "previous" navigation.
-    ref: A file, URL, or Python list containing the flashcard JSON.
-    keyControl: Enable keyboard controls (right: next, left: previous, space: flip)
-    grabFocus: Whether to automatically focus the flashcard container.
-    shuffle_cards: Shuffle the cards when cycling.
-    front_colors, back_colors, text_colors: Optional alternate color schemes.
-    title, subject: Metadata for structured data.
-    topics: Filter flashcards by topic.
+    Display interactive flash cards using a mix of Python and Javascript to support
+    use in rendered notebooks (especially JupyterBook, but also Voila)
+
+    Inputs:
+    ref = string, reference to quiz JSON, may be:
+          - file name
+          - URL
+          - Python list
+
+    keyControl = boolean, whether to support keyboard: right = advance, space = flip,
+                 left = previous
+
+    grabFocus = boolean, whether to put browser focus on this slide deck
+
+    shuffle_cards = boolean, whether to randomize card order
+
+    front_colors, back_colors, text_colors:
+          can be lists or a special string ('jupytercon')
+
+    title   = string, title of this flashcard set
+    subject = string, subject of this flashcard set
+    topics  = string or list, to filter flashcards by topic
+
+    John M. Shea
+    2021-2025
     '''
-    
-    # Specify default color schemes
+
+    # Specify default front colors
     front_color_dict = [
         'var(--asparagus)',
         'var(--terra-cotta)',
         'var(--cyan-process)'
     ]
-    back_color_dict = ['var(--dark-blue-gray)']
-    text_color_dict = ['var(--snow)']
-    
+
+    # Specify default back color
+    back_color_dict = [
+        'var(--dark-blue-gray)'
+    ]
+
+    # Define color schemes for JupyterCon (2023)
     jupytercon_front = [
         'hsla(17.65,100%,50%,1)',
         'rgb(234,196,53)',
         'hsla(200,76.74%,83.14%, 1)'
     ]
-    jupytercon_back = ['hsla(208.78,66.49%,36.27%,1)']
-    
+
+    jupytercon_back = [
+        'hsla(208.78,66.49%,36.27%,1)'
+    ]
+
+    # Specify default text color
+    text_color_dict = [
+        'var(--snow)'
+    ]
+
+    # Allow user to specify alternate color schemes
     if front_colors:
         if isinstance(front_colors, list):
             front_color_dict = front_colors
         elif front_colors == 'jupytercon':
             front_color_dict = jupytercon_front
-    
+
     if back_colors:
         if isinstance(back_colors, list):
             back_color_dict = back_colors
         elif back_colors == 'jupytercon':
             back_color_dict = jupytercon_back
-    
+
     if text_colors:
         if isinstance(text_colors, list):
             text_color_dict = text_colors
-    
-    # Generate a unique ID for the card container BEFORE using it in JS.
-    letters = string.ascii_letters
-    div_id = ''.join(random.choice(letters) for i in range(12))
-    
-    # Load external CSS/JS resources
+
+    # Load external style and JavaScript files
     resource_package = __name__
     package = resource_package.split('.')[0]
-    
+
+    # Loading CSS Styles
     styles = "<style>\n"
     f = importlib.resources.files(package).joinpath('styles.css')
     css = f.read_bytes()
     styles += css.decode("utf-8")
     styles += "\n</style>"
-    
-    script = ""
+
+    # Load JavaScript files
+    script = ''
     f = importlib.resources.files(package).joinpath('swiped-events.min.js')
     js = f.read_bytes()
     script += js.decode("utf-8")
     f = importlib.resources.files(package).joinpath('flashcards.js')
     js = f.read_bytes()
     script += js.decode("utf-8")
-    
-    # Now add a JS function that creates the cards once the container exists.
+
+    # Generate a unique ID for each card set
+    letters = string.ascii_letters
+    div_id = ''.join(random.choice(letters) for i in range(12))
+
+    # Define a function to be run periodically until the div is present in the DOM.
     script += f'''
         function try_create() {{
           if(document.getElementById("{div_id}")) {{
@@ -90,27 +122,25 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
           }}
         }};
     '''
-    
-    # The container for the flashcards.
-    mydiv = f'<div class="flip-container" id="{div_id}" tabindex="0" style="outline:none;"></div>'
-    
-    # Create spacer and navigation buttons (set default label for visibility)
+
+    # This will be the container for the cards
+    mydiv =  f'<div class="flip-container" id="{div_id}" tabindex="0" style="outline:none;"></div>'
+
+    # Spacer (for vertical spacing)
     spacer = '<div style="height:40px"></div>'
-    prevbutton = f"""<div class="previous" id="{div_id}-prev" onclick="window.checkFlipPrev('{div_id}')">< Previous</div> """
-    nextbutton = f"""<div class="next" id="{div_id}-next" onclick="window.checkFlip('{div_id}')">Next ></div> """
-    
-    # Handling data based on the type of `ref`
+
+    # Handling data based on the type of `ref` (list, URL, or file)
     json_data = ""
-    if isinstance(ref, list):
+    if type(ref) == list:
         all_cards = ref
         static = True
         url = ""
-    elif isinstance(ref, str):
+    elif type(ref) == str:
         if ref[0] == "[":
             all_cards = json.loads(ref)
             static = True
             url = ""
-        elif ref.lower().startswith("http"):
+        elif ref.lower().find("http") == 0:
             url = ref
             if sys.platform == 'emscripten':
                 try: 
@@ -119,7 +149,8 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
                     try:
                         from pyodide import open_url
                     except:
-                        print('Error importing open_url.')
+                        print('Importing open_url failed. Please raise an issue at')
+                        print('https://github.com/jmshea/jupyterquiz/issues')
                 json_data += open_url(url).read()
             else:
                 file = urllib.request.urlopen(url)
@@ -135,50 +166,70 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
             url = ""
             all_cards = json.loads(json_data)
     else:
-        raise Exception("First argument must be a list (JSON), URL, or file reference")
-    
-    # Filter cards based on topics if provided.
+        raise Exception("First argument must be list (JSON), URL, or file ref")
+
+    # Filter cards based on topics (if specified)
     if topics:
         if isinstance(topics, str):
             topics = [topics]
-        cards = [card for card in all_cards if card.get("topic") and any(topic in card.get("topic") for topic in topics)]
+        cards = []
+        for card in all_cards:
+            if card.get("topic"):
+                if any(topic in card.get("topic") for topic in topics):
+                    cards.append(card)
     else:
         cards = all_cards
-    
-    # Pass flashcard data and color schemes to the JavaScript environment.
-    loadData = f"\nvar cards{div_id} = {json.dumps(cards)};\n"
-    
-    loadData += "var frontColors{0} = [".format(div_id)
-    loadData += ", ".join(f'"{color}"' for color in front_color_dict) + "];\n"
-    
-    loadData += "var backColors{0} = [".format(div_id)
-    loadData += ", ".join(f'"{color}"' for color in back_color_dict) + "];\n"
-    
-    loadData += "var textColors{0} = [".format(div_id)
-    loadData += ", ".join(f'"{color}"' for color in text_color_dict) + "];\n"
-    
+
+    # Add the cards to the JavaScript 
+    loadData = '\n'
+    loadData += f"var cards{div_id}={json.dumps(cards)};\n"
+
+    # Add color schemes to the JavaScript
+    loadData += f"var frontColors{div_id}= ["
+    for color in front_color_dict[:-1]:
+        loadData += f'"{color}", '
+    loadData += f'"{front_color_dict[-1]}" ];\n'
+
+    loadData += f"var backColors{div_id}= ["
+    for color in back_color_dict[:-1]:
+        loadData += f'"{color}", '
+    loadData += f'"{back_color_dict[-1]}" ];\n'
+
+    loadData += f"var textColors{div_id}= ["
+    for color in text_color_dict[:-1]:
+        loadData += f'"{color}", '
+    loadData += f'"{text_color_dict[-1]}" ];\n'
+
     if static:
-        loadData += "try_create();"
+        loadData += f'''try_create(); '''
     else:
         loadData += f'''
         {{
-          const jmscontroller = new AbortController();
-          const signal = jmscontroller.signal;
-          setTimeout(() => jmscontroller.abort(), 5000);
-          fetch("{url}", {{signal}})
-          .then(response => response.json())
-          .then(json => createCards("{div_id}", "{keyControl}", "{grabFocus}", "{shuffle_cards}", "{title}", "{subject}"))
-          .catch(err => {{
-            console.log("Fetch error or timeout");
-            try_create();
-          }});
+        const jmscontroller = new AbortController();
+        const signal = jmscontroller.signal;
+        setTimeout(() => jmscontroller.abort(), 5000);
+        fetch("{url}", {{signal}})
+        .then(response => response.json())
+        .then(json => createCards("{div_id}", "{keyControl}", "{grabFocus}", "{shuffle_cards}", "{title}", "{subject}"))
+        .catch(err => {{
+        console.log("Fetch error or timeout");
+        try_create(); 
+        }});
         }}
         '''
-    
-    display(HTML(styles))
-    display(HTML(spacer + mydiv + spacer + prevbutton + nextbutton + spacer))
-    display(Javascript(script + loadData))
 
+    # Create navigation buttons now that we know the number of cards.
+    prevbutton = f"""<div class="prev" id="{div_id}-prev" onclick="window.checkPrev('{div_id}')"> &lt; Prev </div>"""
+    cardNumber = f"""<div class="card-number" id="{div_id}-cardnumber">1/{len(cards)}</div>"""
+    nextbutton = f"""<div class="next" id="{div_id}-next" onclick="window.checkFlip('{div_id}')"> Next &gt; </div>"""
+
+    # Display the content in the notebook
+    display(HTML(styles))
+    display(HTML(spacer + mydiv + spacer + prevbutton + cardNumber + nextbutton + spacer))
+    display(Javascript(script+loadData))
+
+
+# Functions to help make flashcard JSON files
 
 def makecard(name, front, back):
     if front and not back:
@@ -186,15 +237,20 @@ def makecard(name, front, back):
         front = name
     elif back and not front:
         front = name
-    return {'name': name, 'front': front, 'back': back}
+    card = {'name': name,
+            'front': front,
+            'back': back}
+    return card
 
 
 def md2json(md, savefile=False):
     cards = []
     front = ''
     back = ''
+    blank = False
     onback = False
-    for line in md.splitlines():
+
+    for line in iter(md.splitlines()):
         line = line.strip()
         if line:
             if line[0] == "#":
@@ -202,27 +258,37 @@ def md2json(md, savefile=False):
                     line = line[1:]
                 if front or back:
                     card = makecard(name, front, back)
-                    cards.append(card)
+                    cards += [card]
                 name = line.strip()
                 front = ''
                 back = ''
                 onback = False
+                blank = False
             else:
-                if line.startswith('---'):
+                if len(line) >= 3 and line[:3] == '---':
                     onback = True
-                else:
+                else: 
                     if onback:
-                        back += (' ' if back else '') + line
+                        if back:
+                            back += ' ' 
+                        back += line
                     else:
-                        front += (' ' if front else '') + line
+                        if front:
+                            front += ' '
+                        front += line
         else:
             if onback and back:
                 back += '<br>'
+                blank = False
             elif front:
                 front += '<br>'
+                blank = False
+
     card = makecard(name, front, back)
-    cards.append(card)
+    cards += [card]
+
     if savefile:
         with open(savefile, 'w') as f:
             json.dump(cards, f)
+
     return json.dumps(cards, indent=4)

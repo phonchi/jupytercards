@@ -84,9 +84,9 @@ function slide2(containerId) {
     next.classList.remove('flipped');
     next.classList.add('hide');
     container.className = "flip-container slide";
-    // In the "next" transition, remove the front card and append it at the end.
-    backcard.parentElement.removeChild(frontcard);
-    backcard.parentElement.appendChild(frontcard);
+    // For next: remove the front card and append it.
+    container.removeChild(frontcard);
+    container.appendChild(frontcard);
     setTimeout(slideback, 600, container, frontcard, backcard, next);
 }
 
@@ -103,7 +103,7 @@ function cleanup(container, frontcard, backcard, next) {
     let cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
     var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
-    container.append(flipper);
+    container.appendChild(flipper);
     cardnum = (cardnum + 1) % parseInt(container.dataset.numCards);
     if ((cardnum == 0) && (container.dataset.shuffleCards == "True")) {
         cardOrder = randomOrderArray(parseInt(container.dataset.numCards));
@@ -113,7 +113,7 @@ function cleanup(container, frontcard, backcard, next) {
     if (cardnum != 1) {
         next.innerHTML = "Next >";
     } else {
-        next.innerHTML = 'Reload <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 25 26"> <path d="M7,6a10,10,0,1,0,9,0" style="fill:none;stroke:black;stroke-width:2px"/> <line x1="17" y1="6.5" x2="17.5" y2="15" style="stroke:black;fill:none;stroke-width:2px"/> <line x1="16.5" y1="6.5" x2="26" y2="8" style="stroke:black;fill:none;stroke-width:2px"/> </svg> ';
+        next.innerHTML = 'Reload <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 26"> <path d="M7,6a10,10,0,1,0,9,0" style="fill:none;stroke:black;stroke-width:2px"/> <line x1="17" y1="6.5" x2="17.5" y2="15" style="stroke:black;fill:none;stroke-width:2px"/> <line x1="16.5" y1="6.5" x2="26" y2="8" style="stroke:black;fill:none;stroke-width:2px"/> </svg> ';
         if (typeof MathJax != 'undefined') {
             var version = MathJax.version;
             if (version[0] == "2") {
@@ -157,9 +157,12 @@ function slide2Prev(containerId) {
     prev.style.pointerEvents = 'none';
     prev.classList.add('flipped');
     container.className = "flip-container slide";
-    // For the "previous" transition, remove the hidden (back) card.
+    // For previous: remove the back card and then insert it at the beginning.
     var backcard = container.children[1];
+    // Remove back card from its current position...
     container.removeChild(backcard);
+    // And immediately insert it at the beginning.
+    container.insertBefore(backcard, container.firstChild);
     setTimeout(slidebackPrev, 600, container, prev);
 }
 
@@ -169,22 +172,23 @@ function slidebackPrev(container, prev) {
 }
 
 function cleanupPrev(container, prev) {
-    // Remove the remaining visible card.
-    var currentCard = container.children[0];
-    container.removeChild(currentCard);
+    // Remove the back card (now at the top) to complete the reverse transition.
+    var backcard = container.children[0];
+    container.removeChild(backcard);
     var cardnum = parseInt(container.dataset.cardnum);
     var total = parseInt(container.dataset.numCards);
     let cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
-    // Decrement the card index with wrap-around.
+    // Decrement card index with wrap-around.
     cardnum = (cardnum - 1 + total) % total;
     var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
+    // Prepend the new card to the container.
     container.insertBefore(flipper, container.firstChild);
     container.dataset.cardnum = cardnum;
     if (cardnum != total - 1) {
         prev.innerHTML = "< Previous";
     } else {
-        prev.innerHTML = 'Reload';
+        prev.innerHTML = "Reload";
     }
     prev.style.pointerEvents = 'auto';
     container.style.pointerEvents = 'auto';
@@ -211,8 +215,8 @@ function createOneCard(mydiv, frontCard, cards, cardnum, seq) {
     frontSpan.innerHTML = jaxify(cards[cardnum]['front']);
     frontSpan.style.color = textColors[seq % textColors.length];
     front.style.background = colors[seq % colors.length];
-    front.append(frontSpan);
-    flipper.append(front);
+    front.appendChild(frontSpan);
+    flipper.appendChild(front);
     var back = document.createElement('div');
     back.className = 'back flashcard';
     back.style.background = backColors[seq % backColors.length];
@@ -220,8 +224,8 @@ function createOneCard(mydiv, frontCard, cards, cardnum, seq) {
     backSpan.className = 'flashcardtext';
     backSpan.innerHTML = jaxify(cards[cardnum]['back']);
     backSpan.style.color = textColors[seq % textColors.length];
-    back.append(backSpan);
-    flipper.append(back);
+    back.appendChild(backSpan);
+    flipper.appendChild(back);
     return flipper;
 }
 
@@ -295,7 +299,7 @@ function createCards(id, keyControl, grabFocus, shuffleCards, title, subject) {
         } else {
             flipper = createOneCard(mydiv, false, cards, cardOrder[cardnum], cardnum);
         }
-        mydiv.append(flipper);
+        mydiv.appendChild(flipper);
         cardnum = (cardnum + 1) % mydiv.dataset.numCards;
     }
     mydiv.dataset.cardnum = cardnum;

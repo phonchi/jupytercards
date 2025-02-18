@@ -171,6 +171,8 @@ function cleanupPrev(container, frontcard, backcard, prevBtn) {
     }
     prevBtn.style.pointerEvents = 'auto';
     container.style.pointerEvents = 'auto';
+    // IMPORTANT: Remove the "hide" class so the Prev button remains visible.
+    prevBtn.classList.remove('hide');
 }
 
 /* Create one card element */

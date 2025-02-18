@@ -104,53 +104,57 @@ function cleanup(container, frontcard, backcard, next) {
     backcard.className = "flipper frontcard";
     container.className = "flip-container";
 
-    var cardnum = parseInt(container.dataset.cardnum);
-    let cardOrder = JSON.parse(container.dataset.cardOrder);
+    var total = parseInt(container.dataset.numCards);
+    // Use stored nextCard and currentCard values
+    var nextCard = parseInt(container.dataset.nextCard);
+    var cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
 
-    var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
+    // The back card now becomes the visible (current) card:
+    container.dataset.currentCard = nextCard;
+    // Create a new back card using the next card in sequence:
+    var flipper = createOneCard(container, false, cards, cardOrder[nextCard], nextCard);
     container.append(flipper);
-    
-    var total = parseInt(container.dataset.numCards);
-    container.dataset.currentCard = cardnum;
+
+    // Update the display to show the new current card number:
     var numberDisplay = document.getElementById(container.id + '-cardnumber');
     if (numberDisplay) {
-         numberDisplay.innerHTML = (cardnum + 1) + "/" + total;
+         numberDisplay.innerHTML = ((nextCard) + 1) + "/" + total;
     }
-    
-    cardnum = (cardnum + 1) % total;
-    if ((cardnum == 0) && (container.dataset.shuffleCards == "True")) {
-        cardOrder = randomOrderArray(total);
-        container.dataset.cardOrder = JSON.stringify(cardOrder);
-        console.log(cardOrder);
+    // Advance nextCard index:
+    nextCard = (nextCard + 1) % total;
+    if (nextCard == 0 && container.dataset.shuffleCards == "True") {
+         cardOrder = randomOrderArray(total);
+         container.dataset.cardOrder = JSON.stringify(cardOrder);
     }
-    container.dataset.cardnum = cardnum;
-    if (cardnum != 1) {
-        next.innerHTML = "Next >";
+    container.dataset.nextCard = nextCard;
+
+    if (nextCard != 1) {
+         next.innerHTML = "Next >";
     } else {
-        next.innerHTML = 'Reload <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewbox="0 0 25 26"> <path d="M7,6a10,10,0,1,0,9,0" style="fill:none;stroke:black;stroke-width:2px"/> <line x1="17" y1="6.5" x2="17.5" y2="15" style="stroke:black;fill:none;stroke-width:2px"/> <line x1="16.5" y1="6.5" x2="26" y2="8" style="stroke:black;fill:none;stroke-width:2px"/> </svg> ';
-        if (typeof MathJax != 'undefined') {
-            var version = MathJax.version;
-            if (version[0] == "2") {
-                MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
-            } else if (version[0] == "3") {
-                MathJax.typeset([next]);
-            }
-        }
+         next.innerHTML = 'Reload <svg xmlns="http://www.w3.org/2000/svg" ...></svg>';
+         if (typeof MathJax != 'undefined') {
+              var version = MathJax.version;
+              if (version[0] == "2") {
+                  MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
+              } else if (version[0] == "3") {
+                  MathJax.typeset([next]);
+              }
+         }
     }
     if (typeof MathJax != 'undefined') {
-        var version = MathJax.version;
-        if (version[0] == "2") {
-            MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
-        } else if (version[0] == "3") {
-            MathJax.typeset();
-        }
+         var version = MathJax.version;
+         if (version[0] == "2") {
+              MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
+         } else if (version[0] == "3") {
+              MathJax.typeset();
+         }
     }
     next.style.pointerEvents = 'auto';
     container.style.pointerEvents = 'auto';
     next.classList.remove('hide');
     container.addEventListener('swiped-left', function(e) {
-        checkFlip(container.id);
+         checkFlip(container.id);
     }, {once: true});
 }
 
@@ -179,19 +183,19 @@ function cleanupPrev(container, frontcard, backcard, prev) {
     container.className = "flip-container";
     
     var total = parseInt(container.dataset.numCards);
+    var currentCard = parseInt(container.dataset.currentCard);
+    var prevCard = (currentCard - 1 + total) % total;
     var cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
-    var current = parseInt(container.dataset.cardnum);
-    var prevIndex = (current - 1 + total) % total;
-    
-    var flipper = createOneCard(container, false, cards, cardOrder[prevIndex], prevIndex);
+    var flipper = createOneCard(container, false, cards, cardOrder[prevCard], prevCard);
     container.append(flipper);
     
-    container.dataset.cardnum = prevIndex;
-    container.dataset.currentCard = prevIndex;
+    container.dataset.currentCard = prevCard;
+    container.dataset.nextCard = (prevCard + 1) % total;
+    
     var numberDisplay = document.getElementById(container.id + '-cardnumber');
     if (numberDisplay) {
-        numberDisplay.innerHTML = (prevIndex + 1) + "/" + total;
+         numberDisplay.innerHTML = ((prevCard) + 1) + "/" + total;
     }
     prev.style.pointerEvents = 'auto';
     container.style.pointerEvents = 'auto';
@@ -202,10 +206,11 @@ function createOneCard(mydiv, frontCard, cards, cardnum, seq) {
     var backColors = eval('backColors' + mydiv.id);
     var textColors = eval('textColors' + mydiv.id);
     var flipper = document.createElement('div');
-    if (frontCard) {
-        flipper.className = "flipper frontcard";    
-    } else {
-        flipper.className = "flipper backcard";   
+    if (frontCard){
+         flipper.className = "flipper frontcard";    
+    }
+    else {
+         flipper.className = "flipper backcard";   
     }
     var front = document.createElement('div');
     front.className = 'front flashcard';
@@ -231,47 +236,46 @@ function createOneCard(mydiv, frontCard, cards, cardnum, seq) {
 function randomOrderArray(N) {
     let arr = Array.from({ length: N }, (_, index) => index);
     for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+         const j = Math.floor(Math.random() * (i + 1));
+         [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
 }
 
 function createStructuredData(mydiv, cards, title, subject) {
     var structuredData = {
-        "@context": "https://schema.org/",
-        "@type": "Quiz",
-        "about": {
-            "@type": "Thing"
-        },
-        "educationalAlignment": [
-            {
-                "@type": "AlignmentObject",
-                "alignmentType": "educationalSubject"
-            }
-        ],
-        "hasPart": []
+         "@context": "https://schema.org/",
+         "@type": "Quiz",
+         "about": {
+              "@type": "Thing"
+         },
+         "educationalAlignment": [
+              {
+                   "@type": "AlignmentObject",
+                   "alignmentType": "educationalSubject"
+              }
+         ],
+         "hasPart": []
     };
 
     structuredData["about"]["name"] = title;
     structuredData["educationalAlignment"][0]["targetName"] = subject;
 
     for (var i = 0; i < cards.length; i++) {
-        var newPart = {
-            "@context": "https://schema.org/",
-            "@type": "Question",
-            "eduQuestionType": "Flashcard",
-            "acceptedAnswer": {
-                "@type": "Answer",
-            }
-        };
+         var newPart = {
+              "@context": "https://schema.org/",
+              "@type": "Question",
+              "eduQuestionType": "Flashcard",
+              "acceptedAnswer": {
+                   "@type": "Answer",
+              }
+         };
 
-        newPart["text"] = cards[i]["front"];
-        newPart["acceptedAnswer"]["text"] = cards[i]["back"];
+         newPart["text"] = cards[i]["front"];
+         newPart["acceptedAnswer"]["text"] = cards[i]["back"];
 
-        structuredData["hasPart"].push(newPart);
+         structuredData["hasPart"].push(newPart);
     }
-
     var el = document.createElement('script');
     el.type = 'application/ld+json';
     el.text = JSON.stringify(structuredData);
@@ -282,45 +286,41 @@ function createCards(id, keyControl, grabFocus, shuffleCards, title, subject) {
     var mydiv = document.getElementById(id);
     mydiv.onclick = function() { window.flipCard(mydiv); };
     if (keyControl == "True") {
-        mydiv.onkeydown = function(event) { window.checkKey(mydiv, event); };
+         mydiv.onkeydown = function(event) { window.checkKey(mydiv, event); };
     }
     var cards = eval('cards' + id);
-    mydiv.dataset.cardnum = 0;
     mydiv.dataset.numCards = cards.length;
     mydiv.dataset.shuffleCards = shuffleCards;
     var cardOrder;
     if (shuffleCards == "True") {
-        cardOrder = randomOrderArray(cards.length);
+         cardOrder = randomOrderArray(cards.length);
     } else {
-        cardOrder = Array.from({ length: cards.length }, (_, index) => index);
+         cardOrder = Array.from({ length: cards.length }, (_, index) => index);
     }
     mydiv.dataset.cardOrder = JSON.stringify(cardOrder);
     mydiv.addEventListener('swiped-left', function(e) {
-        checkFlip(id);
+         checkFlip(id);
     }, { once: true });
     if ((title != "") || (subject != "")) {
-        createStructuredData(mydiv, cards, title, subject);
+         createStructuredData(mydiv, cards, title, subject);
     }
-    var cardnum = 0;
-    for (var i = 0; i < 2; i++) {
-        var flipper;
-        if (i == 0) {
-            flipper = createOneCard(mydiv, true, cards, cardOrder[cardnum], cardnum);
-        } else {
-            flipper = createOneCard(mydiv, false, cards, cardOrder[cardnum], cardnum);
-        }
-        mydiv.append(flipper);
-        cardnum = (cardnum + 1) % mydiv.dataset.numCards;
-    }
-    mydiv.dataset.cardnum = cardnum;
+    // Initialize indices: currentCard for the visible card and nextCard for the next card.
+    var currentCard = 0;
+    var nextCard = (cards.length > 1 ? 1 : 0);
+    var flipperFront = createOneCard(mydiv, true, cards, cardOrder[currentCard], currentCard);
+    mydiv.append(flipperFront);
+    var flipperBack = createOneCard(mydiv, false, cards, cardOrder[nextCard], nextCard);
+    mydiv.append(flipperBack);
+    mydiv.dataset.currentCard = currentCard;
+    mydiv.dataset.nextCard = nextCard;
     var next = document.getElementById(id + '-next');
     if (cards.length == 1) {
-        next.style.pointerEvents = 'none';
-        next.classList.add('hide');
+         next.style.pointerEvents = 'none';
+         next.classList.add('hide');
     } else {
-        next.innerHTML = "Next >";
+         next.innerHTML = "Next >";
     }
     if (grabFocus == "True")
-        mydiv.focus();
-    return flipper;
+         mydiv.focus();
+    return flipperBack;
 }

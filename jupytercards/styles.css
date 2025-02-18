@@ -260,3 +260,8 @@
     transform: translateX(0px) translateZ(20px) rotateY(0deg);
     z-index: 10;
 }
+
+.flip-container.slide-next, .flip-container.slide-prev {
+    transition: transform 0.6s ease;
+}
+

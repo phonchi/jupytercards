@@ -103,14 +103,12 @@
 	top: 0;
 }
 
-/* front pane */
 .front {
     background: var(--asparagus);
 	transform: rotateY(0deg);
 	z-index: 2;
 }
 
-/* back pane */
 .back {
     background: var(--dark-blue-gray);
 	transform: rotateY(180deg);

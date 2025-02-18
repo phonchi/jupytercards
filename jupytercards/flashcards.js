@@ -1,4 +1,3 @@
-
 function jaxify(string) {
     var mystring = string;
     var count = 0;
@@ -28,7 +27,7 @@ function jaxify(string) {
 }
 
 window.flipCard = function flipCard(ths) {
-    ths.classList.toggle("flip"); 
+    ths.classList.toggle("flip");
     ths.focus();
     var next = document.getElementById(ths.id + '-next');
     next.style.pointerEvents = 'none';
@@ -41,8 +40,11 @@ window.flipCard = function flipCard(ths) {
             MathJax.typeset([ths]);
         }
     }
-    setTimeout(reenableNext, 600, ths, next);
-}
+    setTimeout(function(){
+        next.style.pointerEvents = 'auto';
+        next.classList.remove('flipped');
+    }, 600);
+};
 
 window.checkKey = function checkKey(container, event) {
     event.stopPropagation();
@@ -60,12 +62,17 @@ window.checkKey = function checkKey(container, event) {
         }
     }
     event.preventDefault();
-}
+};
 
-function reenableNext(ths, next) {
-    next.style.pointerEvents = 'auto';
-    next.classList.remove('flipped');
-}
+window.checkFlip = function checkFlip(containerId) {
+    var container = document.getElementById(containerId);
+    if (container.classList.contains('flip')) {
+        container.classList.remove('flip');
+        setTimeout(slide2, 600, containerId);
+    } else {
+        slide2(containerId);
+    }
+};
 
 function slide2(containerId) {
     var container = document.getElementById(containerId);
@@ -77,19 +84,10 @@ function slide2(containerId) {
     next.classList.remove('flipped');
     next.classList.add('hide');
     container.className = "flip-container slide";
+    // In the "next" transition, remove the front card and append it at the end.
     backcard.parentElement.removeChild(frontcard);
     backcard.parentElement.appendChild(frontcard);
     setTimeout(slideback, 600, container, frontcard, backcard, next);
-}
-
-window.checkFlip = function checkFlip(containerId) {
-    var container = document.getElementById(containerId);
-    if (container.classList.contains('flip')) {
-        container.classList.remove('flip');
-        setTimeout(slide2, 600, containerId);
-    } else {
-        slide2(containerId);
-    }
 }
 
 function slideback(container, frontcard, backcard, next) {
@@ -141,8 +139,7 @@ function cleanup(container, frontcard, backcard, next) {
     }, {once: true});
 }
 
-/* ----- Functions for the "previous" button ----- */
-
+/* ----- Previous Button Functions ----- */
 window.checkFlipPrev = function checkFlipPrev(containerId) {
     var container = document.getElementById(containerId);
     if (container.classList.contains('flip')) {
@@ -156,27 +153,30 @@ window.checkFlipPrev = function checkFlipPrev(containerId) {
 function slide2Prev(containerId) {
     var container = document.getElementById(containerId);
     var prev = document.getElementById(containerId + '-prev');
-    var frontcard = container.children[0];
-    var backcard = container.children[1];
     container.style.pointerEvents = 'none';
     prev.style.pointerEvents = 'none';
     prev.classList.add('flipped');
     container.className = "flip-container slide";
+    // For the "previous" transition, remove the hidden (back) card.
+    var backcard = container.children[1];
     container.removeChild(backcard);
-    setTimeout(slidebackPrev, 600, container, frontcard, prev);
+    setTimeout(slidebackPrev, 600, container, prev);
 }
 
-function slidebackPrev(container, frontcard, prev) {
+function slidebackPrev(container, prev) {
     container.className = "flip-container slideback";
-    setTimeout(cleanupPrev, 550, container, frontcard, prev);
+    setTimeout(cleanupPrev, 550, container, prev);
 }
 
-function cleanupPrev(container, frontcard, prev) {
-    container.removeChild(frontcard);
+function cleanupPrev(container, prev) {
+    // Remove the remaining visible card.
+    var currentCard = container.children[0];
+    container.removeChild(currentCard);
     var cardnum = parseInt(container.dataset.cardnum);
     var total = parseInt(container.dataset.numCards);
     let cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
+    // Decrement the card index with wrap-around.
     cardnum = (cardnum - 1 + total) % total;
     var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
     container.insertBefore(flipper, container.firstChild);
@@ -200,9 +200,9 @@ function createOneCard(mydiv, frontCard, cards, cardnum, seq) {
     var textColors = eval('textColors' + mydiv.id);
     var flipper = document.createElement('div');
     if (frontCard) {
-        flipper.className = "flipper frontcard";    
+        flipper.className = "flipper frontcard";
     } else {
-        flipper.className = "flipper backcard";   
+        flipper.className = "flipper backcard";
     }
     var front = document.createElement('div');
     front.className = 'front flashcard';
@@ -238,15 +238,11 @@ function createStructuredData(mydiv, cards, title, subject) {
     var structuredData = {
         "@context": "https://schema.org/",
         "@type": "Quiz",
-        "about": {
-            "@type": "Thing"
-        },
-        "educationalAlignment": [
-            {
-                "@type": "AlignmentObject",
-                "alignmentType": "educationalSubject"
-            }
-        ],
+        "about": {"@type": "Thing"},
+        "educationalAlignment": [{
+            "@type": "AlignmentObject",
+            "alignmentType": "educationalSubject"
+        }],
         "hasPart": []
     };
     structuredData["about"]["name"] = title;
@@ -256,9 +252,7 @@ function createStructuredData(mydiv, cards, title, subject) {
             "@context": "https://schema.org/",
             "@type": "Question",
             "eduQuestionType": "Flashcard",
-            "acceptedAnswer": {
-                "@type": "Answer"
-            }
+            "acceptedAnswer": {"@type": "Answer"}
         };
         newPart["text"] = cards[i]["front"];
         newPart["acceptedAnswer"]["text"] = cards[i]["back"];

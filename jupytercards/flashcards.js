@@ -29,9 +29,9 @@ function jaxify(string) {
 window.flipCard = function flipCard(ths) {
     ths.classList.toggle("flip"); 
     ths.focus();
-    var next = document.getElementById(ths.id + '-next');
-    next.style.pointerEvents = 'none';
-    next.classList.add('flipped');
+    var nextBtn = document.getElementById(ths.id + '-next');
+    nextBtn.style.pointerEvents = 'none';
+    nextBtn.classList.add('flipped');
     if (typeof MathJax != 'undefined') {
         var version = MathJax.version;
         if (version[0] == "2") {
@@ -41,15 +41,13 @@ window.flipCard = function flipCard(ths) {
         }
     }
     setTimeout(function(){ 
-         next.style.pointerEvents = 'auto';
-         next.classList.remove('flipped');
+         nextBtn.style.pointerEvents = 'auto';
+         nextBtn.classList.remove('flipped');
     }, 600);
 };
 
 window.checkKey = function checkKey(container, event) {
     event.stopPropagation();
-    var next = document.getElementById(container.id + '-next');
-    var prev = document.getElementById(container.id + '-prev');
     if (event.key == "ArrowRight" || event.key == "j" || event.key == "Enter") {
          window.checkFlip(container.id);
     } else if (event.key == "ArrowLeft") {
@@ -61,85 +59,131 @@ window.checkKey = function checkKey(container, event) {
 };
 
 window.checkFlip = function checkFlip(containerId) {
-    slideNext(containerId);
+    slide2(containerId);
 };
 
 window.checkPrev = function checkPrev(containerId) {
-    slidePrev(containerId);
+    slide2Prev(containerId);
 };
 
-function slideNext(containerId) {
+/* NEXT (forward) transition – using original animation classes */
+function slide2(containerId) {
     var container = document.getElementById(containerId);
     var nextBtn = document.getElementById(containerId + '-next');
-    container.classList.add("slide-next");
+    var frontcard = container.children[0];
+    var backcard = container.children[1];
+    container.style.pointerEvents = 'none';
     nextBtn.style.pointerEvents = 'none';
+    nextBtn.classList.remove('flipped');
+    nextBtn.classList.add('hide');
+    container.className = "flip-container slide";
+    // Rearrange the two cards as in original code
+    backcard.parentElement.removeChild(frontcard);
+    backcard.parentElement.appendChild(frontcard);
     setTimeout(function(){
-         cleanupNext(container, nextBtn);
+         slideback(container, frontcard, backcard, nextBtn);
     }, 600);
 }
 
-function cleanupNext(container, nextBtn) {
-    if (container.children.length > 0) {
-         container.removeChild(container.children[0]);
-    }
-    if (container.children.length > 0) {
-         container.children[0].className = "flipper frontcard";
-    }
+function slideback(container, frontcard, backcard, nextBtn) {
+    container.className = "flip-container slideback";
+    setTimeout(function(){
+         cleanup(container, frontcard, backcard, nextBtn);
+    }, 550);
+}
+
+function cleanup(container, frontcard, backcard, nextBtn) {
+    container.removeChild(frontcard);
+    backcard.className = "flipper frontcard";
+    container.className = "flip-container";
     var total = parseInt(container.dataset.numCards);
-    var current = parseInt(container.dataset.currentCard);
-    current = (current + 1) % total;
-    container.dataset.currentCard = current;
+    // Update current: the back card becomes visible
+    var current = parseInt(container.dataset.next);
+    container.dataset.current = current;
+    // Compute new next index
+    var next = (current + 1) % total;
+    container.dataset.next = next;
+    // Append new (hidden) back card using the new next index
+    let cardOrder = JSON.parse(container.dataset.cardOrder);
+    var cards = eval('cards' + container.id);
+    var newCard = createOneCard(container, false, cards, cardOrder[next], next);
+    container.append(newCard);
+    // Update counter display using current (visible) card
     var numberDisplay = document.getElementById(container.id + '-cardnumber');
     if (numberDisplay) {
          numberDisplay.innerHTML = (current + 1) + "/" + total;
     }
-    var nextIndex = (current + 1) % total;
-    container.dataset.nextCard = nextIndex;
-    var cardOrder = JSON.parse(container.dataset.cardOrder);
-    var cards = eval('cards' + container.id);
-    var newCard = createOneCard(container, false, cards, cardOrder[nextIndex], nextIndex);
-    container.appendChild(newCard);
-    container.classList.remove("slide-next");
     nextBtn.style.pointerEvents = 'auto';
+    container.style.pointerEvents = 'auto';
+    nextBtn.classList.remove('hide');
+    container.addEventListener('swiped-left', function(e) {
+         checkFlip(container.id);
+    }, {once: true});
 }
 
-function slidePrev(containerId) {
+/* PREV (backward) transition – similar animation but reversed */
+function slide2Prev(containerId) {
     var container = document.getElementById(containerId);
     var prevBtn = document.getElementById(containerId + '-prev');
-    container.classList.add("slide-prev");
+    var frontcard = container.children[0];
+    var backcard = container.children[1];
+    container.style.pointerEvents = 'none';
     prevBtn.style.pointerEvents = 'none';
+    prevBtn.classList.add('hide');
+    container.className = "flip-container slide-prev";
+    // Rearrange the two cards as in the forward transition
+    backcard.parentElement.removeChild(frontcard);
+    backcard.parentElement.appendChild(frontcard);
     setTimeout(function(){
-         cleanupPrev(container, prevBtn);
+         slidebackPrev(container, frontcard, backcard, prevBtn);
     }, 600);
 }
 
-function cleanupPrev(container, prevBtn) {
-    var total = parseInt(container.dataset.numCards);
-    var current = parseInt(container.dataset.currentCard);
-    var prevIndex = (current - 1 + total) % total;
-    var cardOrder = JSON.parse(container.dataset.cardOrder);
-    var cards = eval('cards' + container.id);
-    var newCard = createOneCard(container, true, cards, cardOrder[prevIndex], prevIndex);
-    container.insertBefore(newCard, container.firstChild);
-    if (container.children.length > 2) {
-         container.removeChild(container.children[container.children.length - 1]);
-    }
-    container.dataset.currentCard = prevIndex;
-    var numberDisplay = document.getElementById(container.id + '-cardnumber');
-    if (numberDisplay) {
-         numberDisplay.innerHTML = (prevIndex + 1) + "/" + total;
-    }
-    container.dataset.nextCard = (prevIndex + 1) % total;
-    container.classList.remove("slide-prev");
-    prevBtn.style.pointerEvents = 'auto';
+function slidebackPrev(container, frontcard, backcard, prevBtn) {
+    container.className = "flip-container slideback-prev";
+    setTimeout(function(){
+         cleanupPrev(container, frontcard, backcard, prevBtn);
+    }, 550);
 }
 
+function cleanupPrev(container, frontcard, backcard, prevBtn) {
+    container.removeChild(frontcard);
+    backcard.className = "flipper frontcard";
+    container.className = "flip-container";
+    var total = parseInt(container.dataset.numCards);
+    // Retrieve current visible card index
+    var current = parseInt(container.dataset.current);
+    // New current becomes one card earlier (cycling backward)
+    var newCurrent = (current - 1 + total) % total;
+    container.dataset.current = newCurrent;
+    // Set next to be (newCurrent + 1) mod total
+    var newNext = (newCurrent + 1) % total;
+    container.dataset.next = newNext;
+    // Append new back card using the new next index
+    let cardOrder = JSON.parse(container.dataset.cardOrder);
+    var cards = eval('cards' + container.id);
+    var newCard = createOneCard(container, false, cards, cardOrder[newNext], newNext);
+    container.append(newCard);
+    // Update counter display using new current index
+    var numberDisplay = document.getElementById(container.id + '-cardnumber');
+    if (numberDisplay) {
+         numberDisplay.innerHTML = (newCurrent + 1) + "/" + total;
+    }
+    prevBtn.style.pointerEvents = 'auto';
+    container.style.pointerEvents = 'auto';
+}
+
+/* Create one card element */
 function createOneCard(mydiv, frontCard, cards, cardnum, seq) {
     var colors = eval('frontColors' + mydiv.id);
     var backColors = eval('backColors' + mydiv.id);
     var textColors = eval('textColors' + mydiv.id);
     var flipper = document.createElement('div');
-    flipper.className = frontCard ? "flipper frontcard" : "flipper backcard";
+    if (frontCard){
+         flipper.className = "flipper frontcard";    
+    } else {
+         flipper.className = "flipper backcard";   
+    }
     var front = document.createElement('div');
     front.className = 'front flashcard';
     var frontSpan = document.createElement('span');
@@ -222,21 +266,25 @@ function createCards(id, keyControl, grabFocus, shuffleCards, title, subject) {
     if ((title != "") || (subject != "")) {
          createStructuredData(mydiv, cards, title, subject);
     }
-    // Initialize indices and create two card elements.
-    var currentCard = 0;
-    var nextCard = (cards.length > 1 ? 1 : 0);
-    var flipperFront = createOneCard(mydiv, true, cards, cardOrder[currentCard], currentCard);
+    // Initialize by creating two card elements:
+    var current = 0;
+    var next = (cards.length > 1 ? 1 : 0);
+    var flipperFront = createOneCard(mydiv, true, cards, cardOrder[current], current);
     mydiv.appendChild(flipperFront);
-    var flipperBack = createOneCard(mydiv, false, cards, cardOrder[nextCard], nextCard);
+    var flipperBack = createOneCard(mydiv, false, cards, cardOrder[next], next);
     mydiv.appendChild(flipperBack);
-    mydiv.dataset.currentCard = currentCard;
-    mydiv.dataset.nextCard = nextCard;
+    mydiv.dataset.current = current;
+    mydiv.dataset.next = next;
     var nextBtn = document.getElementById(id + '-next');
     if (cards.length == 1) {
          nextBtn.style.pointerEvents = 'none';
          nextBtn.classList.add('hide');
     } else {
          nextBtn.innerHTML = "Next >";
+    }
+    var numberDisplay = document.getElementById(id + '-cardnumber');
+    if (numberDisplay) {
+         numberDisplay.innerHTML = (current + 1) + "/" + cards.length;
     }
     if (grabFocus == "True")
          mydiv.focus();

@@ -16,46 +16,31 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
                        subject='',
                        topics=None):  
     '''
-    Display interactive flash cards using a mix of Python and Javascript to support
-    use in rendered notebooks (especially JupyterBook, but also Voila)
-
-    Inputs:
-    ref = string, reference to quiz JSON, may be:
-          - file name
-          - URL
-          - Python list
-
-    keyControl = boolean, whether to support keyboard: right = advance, left = go back, space = flip
-
-    grabFocus = boolean, whether to put browser focus on this slide deck
-                (may cause browser to jump to the slide deck)
-
-    shuffle_cards = boolean, whether to present cards in order given or to randomize order
-                    every time you cycle through them
-
-    front_colors, back_colors, text_colors = alternate color schemes; see documentation
-
-    title   = string, title of this flashcard set for structured data
-    subject = string, subject of this flashcard set for structured data
-
-    topics = string or list, topic or topics to filter flashcards
-
-    John  M. Shea
-    2021-2025
+    Display interactive flash cards using a mix of Python and Javascript.
+    Now includes both "next" and "previous" navigation.
+    
+    Parameters:
+      ref: A reference to the flashcard JSON (file, URL, or Python list)
+      keyControl: Enable keyboard controls (right: next, left: previous, space: flip)
+      grabFocus: Whether to automatically focus on the flashcards container
+      shuffle_cards: Boolean; whether to shuffle cards on each cycle
+      front_colors, back_colors, text_colors: Optional color schemes
+      title, subject: Metadata for structured data
+      topics: Optional topics to filter flashcards
     '''
-
+    
     # Specify default front colors
     front_color_dict = [
         'var(--asparagus)',
         'var(--terra-cotta)',
         'var(--cyan-process)'
     ]
-
+    
     # Specify default back color
     back_color_dict = [
         'var(--dark-blue-gray)'
     ]
-
+    
     # Define color schemes for JupyterCon (2023)
     jupytercon_front = [
         'hsla(17.65,100%,50%,1)',
@@ -65,40 +50,40 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
     jupytercon_back = [
         'hsla(208.78,66.49%,36.27%,1)'
     ]
-
+    
     # Specify default text color
     text_color_dict = [
         'var(--snow)'
     ]
-
+    
     # Allow user to specify alternate color schemes
     if front_colors:
         if isinstance(front_colors, list):
             front_color_dict = front_colors
         elif front_colors == 'jupytercon':
             front_color_dict = jupytercon_front
-
+    
     if back_colors:
         if isinstance(back_colors, list):
             back_color_dict = back_colors
         elif back_colors == 'jupytercon':
             back_color_dict = jupytercon_back
-
+    
     if text_colors:
         if isinstance(text_colors, list):
             text_color_dict = text_colors
-
+    
     # Determine the package for resource loading
     resource_package = __name__
     package = resource_package.split('.')[0]
-
+    
     # Loading CSS Styles
     styles = "<style>\n"
     f = importlib.resources.files(package).joinpath('styles.css')
     css = f.read_bytes()
     styles += css.decode("utf-8")
     styles += "\n</style>"
-
+    
     # Load JavaScript files (swiped-events and base flashcards.js)
     script = ''
     f = importlib.resources.files(package).joinpath('swiped-events.min.js')
@@ -107,7 +92,11 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
     f = importlib.resources.files(package).joinpath('flashcards.js')
     js = f.read_bytes()
     script += js.decode("utf-8")
-
+    
+    # Generate a unique ID for each card set BEFORE using it in JS
+    letters = string.ascii_letters
+    div_id = ''.join(random.choice(letters) for i in range(12))
+    
     # Add a function to periodically try creating the cards once the container exists.
     script += f'''
         function try_create() {{
@@ -118,19 +107,15 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
           }}
         }};
     '''
-
-    # Generate a unique ID for each card set
-    letters = string.ascii_letters
-    div_id = ''.join(random.choice(letters) for i in range(12))
-
+    
     # This will be the container for the cards
     mydiv =  f'<div class="flip-container" id="{div_id}" tabindex="0" style="outline:none;"></div>'
-
+    
     # Spacer and Next/Previous button elements
     spacer = '<div style="height:40px"></div>'
     prevbutton = f"""<div class="previous" id="{div_id}-prev" onclick="window.checkFlipPrev('{div_id}')"> </div> """
     nextbutton = f"""<div class="next" id="{div_id}-next" onclick="window.checkFlip('{div_id}')"> </div> """
-
+    
     # Handling data based on the type of `ref`
     json_data = ""
     if type(ref) == list:
@@ -168,7 +153,7 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
             all_cards = json.loads(json_data)
     else:
         raise Exception("First argument must be a list (JSON), URL, or file reference")
-
+    
     # Filter cards based on topics if provided
     if topics:
         if isinstance(topics, str):
@@ -180,26 +165,26 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
                     cards.append(card)
     else:
         cards = all_cards
-
+    
     # Pass card data and color schemes to the JavaScript environment
     loadData = '\n'
     loadData += f"var cards{div_id} = {json.dumps(cards)};\n"
-
+    
     loadData += f"var frontColors{div_id} = ["
     for color in front_color_dict[:-1]:
         loadData += f'"{color}", '
     loadData += f'"{front_color_dict[-1]}" ];\n'
-
+    
     loadData += f"var backColors{div_id} = ["
     for color in back_color_dict[:-1]:
         loadData += f'"{color}", '
     loadData += f'"{back_color_dict[-1]}" ];\n'
-
+    
     loadData += f"var textColors{div_id} = ["
     for color in text_color_dict[:-1]:
         loadData += f'"{color}", '
     loadData += f'"{text_color_dict[-1]}" ];\n'
-
+    
     # Depending on whether the data is static or from a URL, create the cards accordingly
     if static:
         loadData += f'''try_create();'''
@@ -218,7 +203,7 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
         }});
         }}
         '''
-
+    
     # Display the flashcards and both navigation buttons in the notebook
     display(HTML(styles))
     display(HTML(spacer + mydiv + spacer + prevbutton + nextbutton + spacer))
@@ -240,7 +225,6 @@ def md2json(md, savefile=False):
     front = ''
     back = ''
     onback = False
-
     for line in md.splitlines():
         line = line.strip()
         if line:
@@ -268,12 +252,9 @@ def md2json(md, savefile=False):
                 back += '<br>'
             elif front:
                 front += '<br>'
-
     card = makecard(name, front, back)
     cards.append(card)
-
     if savefile:
         with open(savefile, 'w') as f:
             json.dump(cards, f)
-
     return json.dumps(cards, indent=4)

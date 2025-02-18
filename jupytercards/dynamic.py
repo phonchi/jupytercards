@@ -227,8 +227,8 @@ def display_flashcards(ref, keyControl=True, grabFocus=False,
     display(HTML(styles))
     display(HTML(spacer + mydiv + spacer + prevbutton + cardNumber + nextbutton + spacer))
     display(Javascript(script+loadData))
-
-
+    
+    
 # Functions to help make flashcard JSON files
 
 def makecard(name, front, back):

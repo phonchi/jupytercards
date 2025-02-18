@@ -162,7 +162,6 @@ function slide2Prev(containerId) {
     prev.style.pointerEvents = 'none';
     prev.classList.add('flipped');
     container.className = "flip-container slide";
-    // Remove the back card to prepare for inserting at the beginning.
     container.removeChild(backcard);
     setTimeout(slidebackPrev, 600, container, frontcard, prev);
 }
@@ -178,7 +177,6 @@ function cleanupPrev(container, frontcard, prev) {
     var total = parseInt(container.dataset.numCards);
     let cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
-    // Decrement card index with wrap-around
     cardnum = (cardnum - 1 + total) % total;
     var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
     container.insertBefore(flipper, container.firstChild);

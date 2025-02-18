@@ -99,29 +99,23 @@ function cleanup(container, frontcard, backcard, next) {
     container.removeChild(frontcard);
     backcard.className = "flipper frontcard";
     container.className = "flip-container";
-    var cardnum = parseInt(container.dataset.cardnum);
+    var total = parseInt(container.dataset.numCards);
+    var current = parseInt(container.dataset.currentIndex);
+    var nextPointer = parseInt(container.dataset.nextPointer);
     let cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
-    var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
-    container.appendChild(flipper);
-    cardnum = (cardnum + 1) % parseInt(container.dataset.numCards);
-    if ((cardnum == 0) && (container.dataset.shuffleCards == "True")) {
-        cardOrder = randomOrderArray(parseInt(container.dataset.numCards));
-        container.dataset.cardOrder = JSON.stringify(cardOrder);
-    }
-    container.dataset.cardnum = cardnum;
-    if (cardnum != 1) {
-        next.innerHTML = "Next >";
-    } else {
+    // Create a new back card using nextPointer
+    var newCard = createOneCard(container, false, cards, cardOrder[nextPointer], nextPointer);
+    container.appendChild(newCard);
+    // Update pointers: current becomes the card that was in back; nextPointer is advanced.
+    current = nextPointer;
+    nextPointer = (current + 1) % total;
+    container.dataset.currentIndex = current;
+    container.dataset.nextPointer = nextPointer;
+    if (current == 0) {
         next.innerHTML = 'Reload <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 26"> <path d="M7,6a10,10,0,1,0,9,0" style="fill:none;stroke:black;stroke-width:2px"/> <line x1="17" y1="6.5" x2="17.5" y2="15" style="stroke:black;fill:none;stroke-width:2px"/> <line x1="16.5" y1="6.5" x2="26" y2="8" style="stroke:black;fill:none;stroke-width:2px"/> </svg> ';
-        if (typeof MathJax != 'undefined') {
-            var version = MathJax.version;
-            if (version[0] == "2") {
-                MathJax.Hub.Queue(["Typeset", MathJax.Hub]);
-            } else if (version[0] == "3") {
-                MathJax.typeset([next]);
-            }
-        }
+    } else {
+        next.innerHTML = "Next >";
     }
     if (typeof MathJax != 'undefined') {
         var version = MathJax.version;
@@ -157,38 +151,37 @@ function slide2Prev(containerId) {
     prev.style.pointerEvents = 'none';
     prev.classList.add('flipped');
     container.className = "flip-container slide";
-    // For previous: remove the back card and then insert it at the beginning.
-    var backcard = container.children[1];
-    // Remove back card from its current position...
-    container.removeChild(backcard);
-    // And immediately insert it at the beginning.
-    container.insertBefore(backcard, container.firstChild);
-    setTimeout(slidebackPrev, 600, container, prev);
+    // For previous: remove the current front card and store it.
+    var frontcard = container.children[0];
+    container.removeChild(frontcard);
+    setTimeout(slidebackPrev, 600, container, prev, frontcard);
 }
 
-function slidebackPrev(container, prev) {
+function slidebackPrev(container, prev, oldFront) {
     container.className = "flip-container slideback";
-    setTimeout(cleanupPrev, 550, container, prev);
+    setTimeout(cleanupPrev, 550, container, prev, oldFront);
 }
 
-function cleanupPrev(container, prev) {
-    // Remove the back card (now at the top) to complete the reverse transition.
-    var backcard = container.children[0];
-    container.removeChild(backcard);
-    var cardnum = parseInt(container.dataset.cardnum);
+function cleanupPrev(container, prev, oldFront) {
     var total = parseInt(container.dataset.numCards);
+    var current = parseInt(container.dataset.currentIndex);
+    // Compute the previous card index relative to the current visible card.
+    var prevIndex = (current - 1 + total) % total;
     let cardOrder = JSON.parse(container.dataset.cardOrder);
     var cards = eval('cards' + container.id);
-    // Decrement card index with wrap-around.
-    cardnum = (cardnum - 1 + total) % total;
-    var flipper = createOneCard(container, false, cards, cardOrder[cardnum], cardnum);
-    // Prepend the new card to the container.
-    container.insertBefore(flipper, container.firstChild);
-    container.dataset.cardnum = cardnum;
-    if (cardnum != total - 1) {
-        prev.innerHTML = "< Previous";
-    } else {
+    // Create a new front card (note: pass true so it gets the "frontcard" class)
+    var newCard = createOneCard(container, true, cards, cardOrder[prevIndex], prevIndex);
+    container.insertBefore(newCard, container.firstChild);
+    // Append the old front card as the new back card.
+    oldFront.className = "flipper backcard";
+    container.appendChild(oldFront);
+    // Update pointers
+    container.dataset.currentIndex = prevIndex;
+    container.dataset.nextPointer = (prevIndex + 1) % total;
+    if (prevIndex == total - 1) {
         prev.innerHTML = "Reload";
+    } else {
+        prev.innerHTML = "< Previous";
     }
     prev.style.pointerEvents = 'auto';
     container.style.pointerEvents = 'auto';
@@ -275,34 +268,30 @@ function createCards(id, keyControl, grabFocus, shuffleCards, title, subject) {
         mydiv.onkeydown = function(event) { window.checkKey(mydiv, event); };
     }
     var cards = eval('cards' + id);
-    mydiv.dataset.cardnum = 0;
-    mydiv.dataset.numCards = cards.length;
-    mydiv.dataset.shuffleCards = shuffleCards;
+    var total = cards.length;
+    mydiv.dataset.numCards = total;
+    // Create card order (shuffled if requested)
     var cardOrder;
     if (shuffleCards == "True") {
-        cardOrder = randomOrderArray(cards.length);
+        cardOrder = randomOrderArray(total);
     } else {
-        cardOrder = Array.from({ length: cards.length }, (_, index) => index);
+        cardOrder = Array.from({ length: total }, (_, index) => index);
     }
     mydiv.dataset.cardOrder = JSON.stringify(cardOrder);
+    // Set currentIndex and nextPointer
+    mydiv.dataset.currentIndex = 0;
+    mydiv.dataset.nextPointer = (0 + 1) % total;
     mydiv.addEventListener('swiped-left', function(e) {
         checkFlip(id);
     }, {once: true});
     if ((title != "") || (subject != "")) {
         createStructuredData(mydiv, cards, title, subject);
     }
-    var cardnum = 0;
-    for (var i = 0; i < 2; i++) {
-        var flipper;
-        if (i == 0) {
-            flipper = createOneCard(mydiv, true, cards, cardOrder[cardnum], cardnum);
-        } else {
-            flipper = createOneCard(mydiv, false, cards, cardOrder[cardnum], cardnum);
-        }
-        mydiv.appendChild(flipper);
-        cardnum = (cardnum + 1) % mydiv.dataset.numCards;
-    }
-    mydiv.dataset.cardnum = cardnum;
+    // Create the initial two cards.
+    var flipperFront = createOneCard(mydiv, true, cards, cardOrder[0], 0);
+    var flipperBack = createOneCard(mydiv, false, cards, cardOrder[1], 1);
+    mydiv.appendChild(flipperFront);
+    mydiv.appendChild(flipperBack);
     var next = document.getElementById(id + '-next');
     if (cards.length == 1) {
         next.style.pointerEvents = 'none';
@@ -312,5 +301,5 @@ function createCards(id, keyControl, grabFocus, shuffleCards, title, subject) {
     }
     if (grabFocus == "True")
         mydiv.focus();
-    return flipper;
+    return flipperFront;
 }
